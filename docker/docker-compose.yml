@@ -3,9 +3,11 @@ version: "3.9"
 services:
   obc:
     build:
-      context: ./obc
+      context: ..
+      dockerfile: docker/obc/Dockerfile
       args:
         BASE_IMAGE: arm64v8/ubuntu:22.04
+        ROS_DISTRO: ${ROS_DISTRO:-humble}
     image: subsea-rov/obc:dev
     platform: linux/arm64
     privileged: true
@@ -18,9 +20,11 @@ services:
 
   gcs:
     build:
-      context: ./gcs
+      context: ..
+      dockerfile: docker/gcs/Dockerfile
       args:
         BASE_IMAGE: arm64v8/ubuntu:22.04
+        ROS_DISTRO: ${ROS_DISTRO:-humble}
     image: subsea-rov/gcs:dev
     platform: linux/arm64
     devices:

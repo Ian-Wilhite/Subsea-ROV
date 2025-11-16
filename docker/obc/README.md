@@ -1,14 +1,18 @@
 # Onboard Computer (OBC) Image
 
-Template container for the Raspberry Pi 5 that sits inside the vehicle. It supplies Python, build tools, and Pi-specific interfaces (I2C, GPIO) needed for mission software.
+ROS 2-enabled container for the Raspberry Pi 5 that sits inside the vehicle. It supplies Python, build tools, ROS 2 Humble (override via `ROS_DISTRO`), and Pi-specific interfaces (I2C, GPIO) needed for mission software.
 
 ## Build
 
 ```
 docker buildx build \
   --platform linux/arm64 \
+  -f docker/obc/Dockerfile \
   -t subsea-rov/obc:dev \
-  docker/obc
+  .
+
+# Switch ROS distro:
+# docker buildx build --build-arg ROS_DISTRO=iron -f docker/obc/Dockerfile .
 ```
 
 Pass custom arguments as needed:
@@ -28,3 +32,5 @@ docker run -it --rm \
 ```
 
 Mount the mission code into `/workspace/app` (or bake it in during the build) and configure environment variables such as `WORKSPACE_SETUP` if you need to source additional setup scripts before launching ROS nodes.
+
+The default entrypoint sources `/opt/ros/${ROS_DISTRO}/setup.bash`. If you build a colcon workspace inside `/workspace`, export `WORKSPACE_SETUP=/workspace/install/setup.bash` so the entrypoint loads the overlay before executing your command. Source files from `software/onboard` are baked into `/workspace/src/onboard` during the image build so the container always has a copy even when you do not mount the live repository.
