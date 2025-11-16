@@ -1,0 +1,223 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{tocloft}
+\setlength{\cftbeforesecskip}{4pt}
+
+% --- Notation & macros ---
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\mat}[1]{\bm{#1}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\x}{\vect{x}}
+\newcommand{\F}{\vect{F}}
+\newcommand{\Tau}{\vect{\tau}}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\ihat}{\hat{\imath}}
+\newcommand{\jhat}{\hat{\jmath}}
+\newcommand{\khat}{\hat{k}}
+\newcommand{\skew}[1]{\left[#1\right]_\times}
+\newcommand{\T}{^\top}
+
+% Trig shorthands for compact matrices
+\newcommand{\ct}{c_\theta}
+\newcommand{\st}{s_\theta}
+\newcommand{\cf}{c_\phi}
+\newcommand{\sf}{s_\phi}
+\newcommand{\cg}{c_\gamma}
+\newcommand{\sg}{s_\gamma}
+
+% --- Title ---
+\title{Thruster Placement, Transformations, and Differentiable Evaluation for 6-DoF Wrench Authority}
+\author{Ian Wilhite}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+We consider $N$ body-fixed thrusters mounted on or near a reference sphere of radius $\rho$.
+Each thruster produces a force along its own local axis, and we seek to (a) map these forces to a global
+wrench about the origin and (b) optimize placement/orientation for strong, well-conditioned 6-DoF authority.
+This document standardizes frames, derives the required transformations, builds the allocation matrix,
+and proposes a differentiable evaluation function for gradient-based design.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{Resources/Spherical ROV Force diagram(1).png}
+    \caption{non-Gimbaled Thruster ROV Convention}
+    \label{fig:placeholder}
+\end{figure}
+
+\section{Frames, Coordinates, and Conventions}
+\paragraph{Base frame.} The global Cartesian frame $\{B\}$ has orthonormal axes $(x,y,z)$ about the origin.
+\paragraph{Spherical coordinates.} We adopt $(\rho,\theta,\phi)$ with azimuth $\theta$ about $+z$ from $+x$,
+and polar angle $\phi$ measured from $+z$ (north pole).
+The radial unit vector and tangent basis at $(\theta,\phi)$ are
+\begin{equation}
+\vect e_r=
+\begin{bmatrix}\sf\ct\\ \sf\st\\ \cf\end{bmatrix},\quad
+\vect e_\theta=
+\begin{bmatrix}-\st\\ \ct\\ 0\end{bmatrix},\quad
+\vect e_\phi=
+\begin{bmatrix}\cf\ct\\ \cf\st\\ -\sf\end{bmatrix},
+\qquad
+(\vect e_\theta\times\vect e_\phi=\vect e_r).
+\end{equation}
+
+\section{Cartesian $\rightarrow$ Spherical: Coordinates and Basis}
+\paragraph{Point coordinates (nonlinear).}
+For a Cartesian point $\vect p_B=(x,y,z)\T$,
+\begin{equation}
+\rho=\sqrt{x^2+y^2+z^2},\qquad \theta=\operatorname{atan2}(y,x),\qquad \phi=\arccos\!\left(\frac{z}{\rho}\right)\ (\rho>0).
+\end{equation}
+\paragraph{Basis change for vectors (linear).}
+At $(\theta,\phi)$,
+\begin{equation}
+\label{eq:basis-c2s}
+\begin{bmatrix}F_r\\ F_\theta\\ F_\phi\end{bmatrix}
+=
+\underbrace{\begin{bmatrix}
+\sf\ct & \sf\st & \cf\\
+-\st & \ct & 0\\
+\cf\ct & \cf\st & -\sf
+\end{bmatrix}}_{\displaystyle \mat C_{B\to\text{sph}}(\theta,\phi)}
+\begin{bmatrix}F_x\\F_y\\F_z\end{bmatrix},\qquad
+\begin{bmatrix}F_x\\F_y\\F_z\end{bmatrix}
+=
+\underbrace{\begin{bmatrix}\vect e_r & \vect e_\theta & \vect e_\phi\end{bmatrix}}_{\displaystyle \mat C_{\text{sph}\to B}}
+\begin{bmatrix}F_r\\F_\theta\\F_\phi\end{bmatrix}.
+\end{equation}
+
+\section{Surface and Thruster Transforms}
+Define the \emph{surface frame} $\{S\}$ at position $\rho\,\vect e_r$ with axes
+$(x_s,y_s,z_s)=(\vect e_\theta,\vect e_\phi,\vect e_r)$.
+The rotation and translation from $\{B\}$ to $\{S\}$ are
+\begin{equation}
+\label{eq:RBS}
+\mat R_{BS}=\begin{bmatrix}\vect e_\theta & \vect e_\phi & \vect e_r\end{bmatrix}
+=
+\begin{bmatrix}
+-\st & \cf\ct & \sf\ct\\
+\ \ct & \cf\st & \sf\st\\
+0 & -\sf & \cf
+\end{bmatrix},\qquad
+\vect p_{BS}=\rho\,\vect e_r.
+\end{equation}
+The homogeneous transform is
+\begin{equation}
+\mat T_{BS}=
+\begin{bmatrix}
+\mat R_{BS} & \vect p_{BS}\\
+\mathbf 0^\top & 1
+\end{bmatrix}.
+\end{equation}
+Let the \emph{thruster frame} $\{T\}$ be obtained by a rotation $\gamma$ about $z_s=\vect e_r$
+within the tangent plane, then a standoff $d$ along $+z_s$:
+\begin{equation}
+\label{eq:RST}
+\mat R_{ST}(\gamma)=
+\begin{bmatrix}
+\cg & -\sg & 0\\
+\sg & \ \cg & 0\\
+0 & 0 & 1
+\end{bmatrix},\qquad
+\vect p_{ST}=d\begin{bmatrix}0\\0\\1\end{bmatrix}_{\{S\}}.
+\end{equation}
+The cumulative transform is
+\begin{equation}
+\mat T_{BT}=\mat T_{BS}\,\mat T_{ST},\qquad
+\mat R_{BT}=\mat R_{BS}\mat R_{ST},\qquad
+\vect p_{BT}=\vect p_{BS}+\mat R_{BS}\vect p_{ST}=(\rho+d)\,\vect e_r.
+\end{equation}
+
+\section{Force and Wrench Mapping}
+A pure force is rotated but not translated:
+\begin{equation}
+\label{eq:MF}
+\vect F_B=\underbrace{\mat R_{BT}}_{\displaystyle \mat M_F(\theta,\phi,\gamma)}\,\vect F_T.
+\end{equation}
+Carrying out the product $\mat R_{BS}\mat R_{ST}$ yields
+\begin{equation}
+\mat M_F(\theta,\phi,\gamma)=
+\begin{bmatrix}
+-\cg\,\st+\sg\,\cf\,\ct & \ \sg\,\st+\cg\,\cf\,\ct & \ \sf\,\ct\\
+\ \cg\,\ct+\sg\,\cf\,\st & -\sg\,\ct+\cg\,\cf\,\st & \ \sf\,\st\\
+-\sg\,\sf & -\cg\,\sf & \cf
+\end{bmatrix}.
+\end{equation}
+If the thruster produces a wrench $(\vect F_T,\vect \tau_T)$ at $\{T\}$, the base wrench is
+\begin{equation}
+\begin{bmatrix}\vect F_B\\ \vect \tau_B\end{bmatrix}
+=
+\underbrace{\begin{bmatrix}
+\mat R_{BT} & \mathbf 0\\
+\skew{\vect p_{BT}}\mat R_{BT} & \mat R_{BT}
+\end{bmatrix}}_{\displaystyle \mat A^\ast(\rho,\theta,\phi,\gamma,d)}
+\begin{bmatrix}\vect F_T\\ \vect \tau_T\end{bmatrix},
+\end{equation}
+where $\skew{\vect p}$ is the cross-product matrix.
+
+\section{Thruster Wrench Basis ($6\times N$ Allocation)}
+For thruster $i$ with parameters $(\rho_i,\theta_i,\phi_i,\gamma_i,d_i)$, position
+$\vect r_i=(\rho_i+d_i)\,\vect e_{r_i}$ and unit tangential direction
+$\hat{\vect f}_i=\cos\gamma_i\,\vect e_{\theta_i}+\sin\gamma_i\,\vect e_{\phi_i}$, define the unit wrench
+\begin{equation}
+\vect b_i=\begin{bmatrix}\hat{\vect f}_i\\ \vect r_i\times \hat{\vect f}_i\end{bmatrix}\in\R^{6}.
+\end{equation}
+Stacking columns yields the allocation matrix
+\begin{equation}
+\label{eq:B}
+\mat B=\begin{bmatrix}\vect b_1 & \vect b_2 & \cdots & \vect b_N\end{bmatrix}\in\R^{6\times N},
+\qquad
+\begin{bmatrix}\vect F\\ \vect \tau\end{bmatrix}=\mat B\,\vect u,
+\end{equation}
+where $\vect u\in\R^N$ are thrust magnitudes (signed if bidirectional).
+
+\section{Differentiable Evaluation of the Basis}
+For forces (N) and torques (N\,m) we adopt a balancing length $R_{\text{char}}>0$ and define
+\begin{equation}
+\mat W=\mathrm{diag}\!\Big(1,1,1,\tfrac{1}{R_{\text{char}}},\tfrac{1}{R_{\text{char}}},\tfrac{1}{R_{\text{char}}}\Big),
+\qquad
+\widetilde{\mat B}=\mat W\,\mat B,\qquad
+\mat M=\widetilde{\mat B}\,\widetilde{\mat B}\T.
+\end{equation}
+With a small $\varepsilon>0$, we combine three smooth terms into a maximization objective:
+\begin{align}
+J_{\text{vol}}(\mat B) &= \log\det\!\big(\mat M+\varepsilon \mat I_6\big),\\
+P_{\text{iso}}(\mat B) &= \left\|\mat M-\tfrac{\mathrm{tr}(\mat M)}{6}\mat I_6\right\|_F^2,\\
+P_{\text{coh}}(\mat B) &= \sum_{i\neq j}\left(\frac{\widetilde{\vect b}_i\T \widetilde{\vect b}_j}{\|\widetilde{\vect b}_i\|\,\|\widetilde{\vect b}_j\|}\right)^{\!2},
+\end{align}
+and the combined score
+\begin{equation}
+\label{eq:objective}
+\boxed{~J(\mat B)=\alpha\,J_{\text{vol}}(\mat B)-\beta\,P_{\text{iso}}(\mat B)-\gamma\,P_{\text{coh}}(\mat B),~}
+\end{equation}
+with weights $\alpha,\beta,\gamma>0$. The gradient of $J_{\text{vol}}$ admits the closed form
+\begin{equation}
+\frac{\partial J_{\text{vol}}}{\partial \widetilde{\mat B}}=2\big(\mat M+\varepsilon \mat I_6\big)^{-1}\widetilde{\mat B},
+\qquad
+\frac{\partial J_{\text{vol}}}{\partial \mat B}=\mat W^\top\frac{\partial J_{\text{vol}}}{\partial \widetilde{\mat B}}.
+\end{equation}
+
+\section{Optimization Statement and Practical Constraints}
+We optimize angular parameters $\{\phi_i,\theta_i,\gamma_i\}_{i=1}^N$ (and optionally $d_i$) subject to
+bounds and collision/clearance constraints:
+\begin{align}
+\max_{\{\phi_i,\theta_i,\gamma_i\}} \quad & J\!\left(\mat B(\{\phi_i,\theta_i,\gamma_i\})\right)\\
+\text{s.t.}\quad & \phi_i\in[0,\pi],\ \theta_i\in[0,2\pi),\ \gamma_i\in[0,2\pi),\\
+& d_i\in[d_{\min},d_{\max}],\ \text{clearances, FOV, wiring, and mechanical limits.}
+\end{align}
+Choose $R_{\text{char}}$ as a representative arm length, e.g. mean $(\rho_i+d_i)$.
+
+\section{Conclusion}
+This narrative consolidates geometry, transforms, wrench mapping, the allocation matrix,
+and a differentiable objective suitable for gradient-based thruster placement.
+It is intended to be self-contained and implementation-ready.
+
+
+\end{document}

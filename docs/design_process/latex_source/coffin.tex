@@ -1,0 +1,149 @@
+\documentclass{article}
+
+% Language setting
+% Replace `english' with e.g. `spanish' to change the document language
+\usepackage[english]{babel}
+\usepackage{amssymb}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{ROV Four-Thruster Gimbaled Control Basis}
+\author{Ian Wilhite}
+
+\begin{document}
+\noindent
+\maketitle
+
+\section{Introduction}
+
+The current proposed ROV design implements four thrusters and four gimbaled connections. On a mobile platform operating in six Degrees Of Freedom (6-DOF), this presents a system that is inherently underactuated. However, underactuated control is possible and is fundamentally limited by non-holonomic thruster constraints, gimbal angular rates, and reactionary moments from thrust vectoring.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\linewidth]{Resources/Recovered drawing of ROV Force diagram(3).png}
+    \caption{4-Thruster 4-Gimbal ROV Convention}
+    \label{fig:coffin}
+\end{figure}
+
+\subsection{Modeling Assumptions}
+The model shown in Figure \ref{fig:coffin} presents the four-thruster convention with the origin set at the center of mass, x to the starboard side of the vehicle, y to the front of the vehicle, and z out of the page. Roll is measured around the y axis starting from x, pitch is measured around the x axis starting at y, and yaw is measured around the z axis starting at y. 
+
+To effectively compare the controllability of various designs, it is necessary to  assume that 
+
+\section{Dynamics and Control}
+
+\subsection{System Reactions}
+
+The system dynamics can be found by finding the component of each input force applied in each component of the coordinate system. This serves to determine how each degree of freedom of the system is affected by each input force.
+
+% --- Forces (sum) ---
+\begin{align}
+F_x &= \sin\phi_1\!\left(F_4\cos\theta_4 - F_1\cos\theta_1\right)
+     + \sin\phi_2\!\left(F_2\cos\theta_2 - F_3\cos\theta_3\right),\\[2mm]
+F_y &= \cos\phi_1\!\left(F_4\cos\theta_4 + F_1\cos\theta_1\right)
+     + \cos\phi_2\!\left(F_2\cos\theta_2 + F_3\cos\theta_3\right),\\[2mm]
+F_z &= F_1\sin\theta_1 + F_2\sin\theta_2 + F_3\sin\theta_3 + F_4\sin\theta_4.
+\end{align}
+
+Moments are taken with respect to the center of mass of the vehicle using the coordinate $(x_i,y_i)$ for each thruster to find the moment arm. In the 3D extension of the planar case, it is assumed that all forces are acting in the xy-plane of the center of mass. 
+
+% --- Moments about the reference point (z_i = 0) ---
+\begin{align}
+M_x &= \;F_1\sin\theta_1\,y_1 + F_2\sin\theta_2\,y_2
+      + F_3\sin\theta_3\,y_3 + F_4\sin\theta_4\,y_4,\\[2mm]
+M_y &= -F_1\sin\theta_1\,x_1 - F_2\sin\theta_2\,x_2
+      - F_3\sin\theta_3\,x_3 - F_4\sin\theta_4\,x_4,\\[2mm]
+M_z &= -k_{z,1}\,F_1\cos\theta_1 + k_{z,2}\,F_2\cos\theta_2
+      - k_{z,3}\,F_3\cos\theta_3 + k_{z,4}\,F_4\cos\theta_4,
+\end{align}
+\[
+k_{z,i} \;\equiv\; \rho_i\,
+\cos\!\big(\operatorname{atan2}(y_i,x_i)-\phi_j\big),
+\qquad
+\rho_i=\sqrt{x_i^2+y_i^2},
+\]
+where \(j=1\) for \(i\in\{1,4\}\) and \(j=2\) for \(i\in\{2,3\}\).
+
+\subsection{Control Basis Vectors}
+
+The components of the system reaction can be combined to find the wrench of the system applied with respect to each of the input forces. A wrench is a combined column vector of the forces and moments applied in a coordinate system. This 6x4 matrix represents the control basis of the system. The columns of this matrix are the basis vectors, which represent the wrench applied to the system for each input force. 
+
+\[
+\begin{bmatrix}
+w
+\end{bmatrix}
+=
+\begin{bmatrix}
+F\\ \tau
+\end{bmatrix}
+=
+\begin{bmatrix}
+F_x\\ F_y\\ F_z\\ M_x\\ M_y\\ M_z
+\end{bmatrix}
+=
+\underbrace{\begin{bmatrix}
+-\sin\phi_1\cos\theta_1 & \phantom{-}\sin\phi_2\cos\theta_2 & -\sin\phi_2\cos\theta_3 & \phantom{-}\sin\phi_1\cos\theta_4\\[2pt]
+\phantom{-}\cos\phi_1\cos\theta_1 & \phantom{-}\cos\phi_2\cos\theta_2 & \phantom{-}\cos\phi_2\cos\theta_3 & \phantom{-}\cos\phi_1\cos\theta_4\\[2pt]
+\phantom{-}\sin\theta_1          & \phantom{-}\sin\theta_2          & \phantom{-}\sin\theta_3          & \phantom{-}\sin\theta_4\\[2pt]
+\phantom{-}y_1\sin\theta_1       & \phantom{-}y_2\sin\theta_2       & \phantom{-}y_3\sin\theta_3       & \phantom{-}y_4\sin\theta_4\\[2pt]
+-\,x_1\sin\theta_1               & -\,x_2\sin\theta_2               & -\,x_3\sin\theta_3               & -\,x_4\sin\theta_4\\[2pt]
+-\,k_{z,1}\cos\theta_1           & \phantom{-}k_{z,2}\cos\theta_2   & -\,k_{z,3}\cos\theta_3           & \phantom{-}k_{z,4}\cos\theta_4
+\end{bmatrix}}_{B}
+\begin{bmatrix}
+F_1\\ F_2\\ F_3\\ F_4
+\end{bmatrix}.
+\]
+\[
+k_{z,i} \;\equiv\; \rho_i\,
+\cos\!\big(\operatorname{atan2}(y_i,x_i)-\phi_j\big),
+\qquad
+\rho_i=\sqrt{x_i^2+y_i^2},
+\]
+
+\subsection{Verification}
+
+% TODO verifcaiton that the sum of forces in the basis vectors equal one using fx as an example 
+
+
+
+% Thruster-1 direction vector (body frame):
+% azimuth = \phi_1 in the xy-plane, tilt-from-horizontal = \theta_1
+\[
+\mathbf b_1
+=
+\begin{bmatrix}
+\cos\theta_1 \cos\phi_1\\[2pt]
+\cos\theta_1 \sin\phi_1\\[2pt]
+\sin\theta_1
+\end{bmatrix}.
+\]
+
+% Show that it is unit-length:
+\begin{align*}
+\|\mathbf b_1\|^2
+&= (\cos\theta_1\cos\phi_1)^2
+ + (\cos\theta_1\sin\phi_1)^2
+ + (\sin\theta_1)^2\\
+&= \cos^2\theta_1\!\left(\cos^2\phi_1+\sin^2\phi_1\right)
+   + \sin^2\theta_1\\
+&= \cos^2\theta_1\cdot 1 + \sin^2\theta_1
+= \cos^2\theta_1 + \sin^2\theta_1
+= 1.
+\end{align*}
+\[
+\therefore \quad \|\mathbf b_1\|=1.
+\]
+
+
+\section{Conclusion -- Underactuated Control}
+
+The four-thruster, four-gimbal system operates in 8DOF with four controllable basis vectors. This provides the system with full range of motion \textit{if and only if the gimbals can reach any orientation.} Hardware implementation presents concerns about feasibility of the system practically. 
+
+\end{document}
