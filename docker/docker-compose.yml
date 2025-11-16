@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  obc:
+    build:
+      context: ./obc
+      args:
+        BASE_IMAGE: arm64v8/ubuntu:22.04
+    image: subsea-rov/obc:dev
+    platform: linux/arm64
+    privileged: true
+    network_mode: host
+    volumes:
+      - ../software/onboard:/workspace/app:ro
+    environment:
+      - WORKSPACE_SETUP=/workspace/app/setup.bash
+    command: ["bash"]
+
+  gcs:
+    build:
+      context: ./gcs
+      args:
+        BASE_IMAGE: arm64v8/ubuntu:22.04
+    image: subsea-rov/gcs:dev
+    platform: linux/arm64
+    devices:
+      - /dev/input:/dev/input
+    volumes:
+      - ../software/ground_station:/workspace/ui:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+    command: ["bash"]
